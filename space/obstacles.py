@@ -1,9 +1,9 @@
 import asyncio
-from curses_tools import draw_frame
+from tools import draw_frame
 
 
 class Obstacle:
-    
+
     def __init__(self, row, column, rows_size=1, columns_size=1, uid=None):
         self.row = row
         self.column = column

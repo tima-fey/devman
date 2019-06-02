@@ -5,8 +5,8 @@ LEFT_KEY_CODE = 260
 RIGHT_KEY_CODE = 261
 UP_KEY_CODE = 259
 DOWN_KEY_CODE = 258
-ROW_SPEED = 0
-COLUMN_SPEED = 0
+# ROW_SPEED = 0
+# COLUMN_SPEED = 0
 
 FILES_WITH_GARBAGE = {
     'duck': 'animations/duck.txt',
@@ -18,7 +18,9 @@ FILES_WITH_GARBAGE = {
 }
 def read_controls(canvas):
     """Read keys pressed and returns tuple witl controls state."""
-    global ROW_SPEED, COLUMN_SPEED
+    # global ROW_SPEED, COLUMN_SPEED
+    row_speed = 0
+    column_speed = 0
     rows_direction = columns_direction = 0
     space_pressed = False
 
@@ -30,21 +32,21 @@ def read_controls(canvas):
         return rows_direction, columns_direction, space_pressed
 
     if pressed_key_code == UP_KEY_CODE:
-        ROW_SPEED, COLUMN_SPEED = update_speed(ROW_SPEED, COLUMN_SPEED, -1, 0)
+        row_speed, column_speed = update_speed(row_speed, column_speed, -1, 0)
 
     elif pressed_key_code == DOWN_KEY_CODE:
-        ROW_SPEED, COLUMN_SPEED = update_speed(ROW_SPEED, COLUMN_SPEED, 1, 0)
+        row_speed, column_speed = update_speed(row_speed, column_speed, 1, 0)
 
     elif pressed_key_code == RIGHT_KEY_CODE:
-        COLUMN_SPEED, COLUMN_SPEED = update_speed(ROW_SPEED, COLUMN_SPEED, 0, 1)
+        row_speed, column_speed = update_speed(row_speed, column_speed, 0, 1)
 
     elif pressed_key_code == LEFT_KEY_CODE:
-        COLUMN_SPEED, COLUMN_SPEED = update_speed(ROW_SPEED, COLUMN_SPEED, 0, -1)
+        row_speed, column_speed = update_speed(row_speed, column_speed, 0, -1)
 
     elif pressed_key_code == SPACE_KEY_CODE:
         space_pressed = True
     
-    return ROW_SPEED, COLUMN_SPEED, space_pressed
+    return row_speed, column_speed, space_pressed
 
 
 def draw_frame(canvas, start_row, start_column, text, negative=False):
@@ -131,3 +133,8 @@ def get_garbage_animation():
         with open(garbage_file) as _file:
             garbage_animation[garbage_type] = _file.read()
     return garbage_animation
+
+def get_gameover():
+    with open('animations/gameover.txt') as _file:
+        answer = _file.read()
+    return answer
