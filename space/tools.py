@@ -45,13 +45,13 @@ def read_controls(canvas):
 
     elif pressed_key_code == SPACE_KEY_CODE:
         space_pressed = True
-    
+
     return row_speed, column_speed, space_pressed
 
 
 def draw_frame(canvas, start_row, start_column, text, negative=False):
     """Draw multiline text fragment on canvas. Erase text instead of drawing if negative=True is specified."""
-    
+
     rows_number, columns_number = canvas.getmaxyx()
 
     for row, line in enumerate(text.splitlines(), round(start_row)):
@@ -67,7 +67,7 @@ def draw_frame(canvas, start_row, start_column, text, negative=False):
 
             if column >= columns_number:
                 break
-                
+
             if symbol == ' ':
                 continue
 
@@ -83,7 +83,7 @@ def draw_frame(canvas, start_row, start_column, text, negative=False):
 
 def get_frame_size(text):
     """Calculate size of multiline text fragment. Returns pair (rows number, colums number)"""
-    
+
     lines = text.splitlines()
     rows = len(lines)
     columns = max([len(line) for line in lines])
@@ -124,10 +124,11 @@ def change_position(row, col, frame_row, frame_col, delta_row, delta_column, row
     if new_position_col + frame_col // 2 >= col_max - 4:
         new_position_col = col_max - 4 - frame_col // 2
     if new_position_col - frame_col // 2 <= 0:
-        new_position_col = frame_col // 2 
+        new_position_col = frame_col // 2
     return new_position_row, new_position_col
 
 def get_garbage_animation():
+    """Get garbage_animation"""
     garbage_animation = {}
     for garbage_type, garbage_file in FILES_WITH_GARBAGE.items():
         with open(garbage_file) as _file:
@@ -135,6 +136,36 @@ def get_garbage_animation():
     return garbage_animation
 
 def get_gameover():
+    """Get game over logo"""
     with open('animations/gameover.txt') as _file:
         answer = _file.read()
     return answer
+
+
+PHRASES = {
+    # Только на английском, Repl.it ломается на кириллице
+    1957: "First Sputnik",
+    1961: "Gagarin flew!",
+    1969: "Armstrong got on the moon!",
+    1971: "First orbital space station Salute-1",
+    1981: "Flight of the Shuttle Columbia",
+    1998: 'ISS start building',
+    2011: 'Messenger launch to Mercury',
+    2020: "Take the plasma gun! Shoot the garbage!",
+}
+
+def get_garbage_delay_tics(year):
+    if year < 1961:
+        return None
+    elif year < 1969:
+        return 20
+    elif year < 1981:
+        return 14
+    elif year < 1995:
+        return 10
+    elif year < 2010:
+        return 8
+    elif year < 2020:
+        return 6
+    else:
+        return 2

@@ -1,9 +1,10 @@
-import time
 import random
 import curses
 import asyncio
 
-from tools import convert_seconds_to_iterations, get_file, draw_frame, read_controls, change_position, get_frame_size, get_garbage_animation, get_gameover
+from tools import convert_seconds_to_iterations, get_file, draw_frame, read_controls,\
+    change_position, get_frame_size, get_garbage_animation, get_gameover, get_garbage_delay_tics,\
+    PHRASES
 from obstacles import Obstacle
 from explosion import explode
 TIMER = 30000
@@ -19,6 +20,7 @@ SPACESHIP_POSITION_ROW = 0
 SPACESHIP_POSITION_COL = 0
 OBSTACLES = {}
 GAMEOVER = get_gameover()
+YEAR = 1957
 
 class EventLoopCommand():
 
@@ -76,8 +78,9 @@ async def fire(canvas, start_row, start_column, rows_speed=-0.3, columns_speed=0
 async def blink(canvas, row, column, symbol='*'):
     """Display blinking stairs
     """
-    await asyncio.sleep(random.randint(0,200)/100)
-    actions = ((curses.A_DIM, 2), (curses.A_NORMAL, 0.3), (curses.A_BOLD, 0.5), (curses.A_NORMAL, 0.3))
+    await asyncio.sleep(random.randint(0, 200)/100)
+    actions = ((curses.A_DIM, 2), (curses.A_NORMAL, 0.3),\
+        (curses.A_BOLD, 0.5), (curses.A_NORMAL, 0.3))
     while True:
         for (action, sleep_time) in actions:
             canvas.addstr(row, column, symbol, action)
@@ -108,7 +111,8 @@ async def run_spaceship(canvas):
             field_size_col
         )
         for key in list(OBSTACLES.keys()):
-            if OBSTACLES[key].has_collision(SPACESHIP_POSITION_ROW, SPACESHIP_POSITION_COL, spaceship_size_row, spaceship_size_col):
+            if OBSTACLES[key].has_collision(SPACESHIP_POSITION_ROW, SPACESHIP_POSITION_COL,\
+                spaceship_size_row, spaceship_size_col):
                 await show_gameover(canvas)
                 return
         draw_frame(canvas, SPACESHIP_POSITION_ROW, SPACESHIP_POSITION_COL, CURRENT_SPACESHIP_FRAME)
@@ -117,30 +121,32 @@ async def run_spaceship(canvas):
         await asyncio.sleep(0.1)
 
 async def animate_spaceship2():
+    """Change spaceship animation"""
     while True:
         global CURRENT_SPACESHIP_FRAME, OLD_SPACESHIP_FRAME
         CURRENT_SPACESHIP_FRAME, OLD_SPACESHIP_FRAME = OLD_SPACESHIP_FRAME, CURRENT_SPACESHIP_FRAME
         await asyncio.sleep(0.1)
 
 async def handle_buttons(canvas):
+    """Handle buttons"""
     global SPACESHIP_SPEED_ROW, SPACESHIP_SPEED_COL
     while True:
         delta_speed_row, delta_speed_col, is_fire = read_controls(canvas)
         SPACESHIP_SPEED_ROW = SPACESHIP_SPEED_ROW + delta_speed_row
         SPACESHIP_SPEED_COL = SPACESHIP_SPEED_COL + delta_speed_col
-        if is_fire:
+        if is_fire and YEAR >= 2020:
             LOOP.create_task(fire(canvas, SPACESHIP_POSITION_ROW, SPACESHIP_POSITION_COL + 2))
         await asyncio.sleep(0.01)
 
 async def fly_garbage(canvas, column, garbage_frame, obstacle_id, speed=0.05):
-    """Animate garbage, flying from top to bottom. Сolumn position will stay same, as specified on start."""
+    """Animate garbage, flying from top to bottom. Сolumn position will stay same"""
     rows_number, columns_number = canvas.getmaxyx()
     column = max(column, 0)
     column = min(column, columns_number - 1)
 
     row = 0
     obstacle_size_row, obstacle_size_col = get_frame_size(garbage_frame)
-    OBSTACLES[obstacle_id] = Obstacle(row, column, obstacle_size_row, obstacle_size_col, obstacle_id)     
+    OBSTACLES[obstacle_id] = Obstacle(row, column, obstacle_size_row, obstacle_size_col, obstacle_id)
     while row < rows_number:
         draw_frame(canvas, row, column, garbage_frame)
         canvas.border()
@@ -155,24 +161,43 @@ async def fly_garbage(canvas, column, garbage_frame, obstacle_id, speed=0.05):
             OBSTACLES[obstacle_id].row += speed
         row += speed
 
-async def fill_orbit_with_garbage(canvas, garbage_animations, garbage_intension, row_max):
+async def fill_orbit_with_garbage(canvas, garbage_animations, row_max):
+    """Factory to generate garbage"""
     obstacle_id = 0
     while True:
-        garbage_frame = random.choice(list(garbage_animations.values()))
-        column = random.randint(2,row_max-2)
-        # COROUTINES_TO_ADD.append(fly_garbage(canvas, column, garbage_frame))
-        LOOP.create_task(fly_garbage(canvas, column, garbage_frame, obstacle_id))
-        obstacle_id += 1
-        # await Sleep(garbage_intension)
-        await asyncio.sleep(garbage_intension)
+        tik = get_garbage_delay_tics(YEAR)
+        if tik:
+            garbage_intension = tik / 5
+            garbage_frame = random.choice(list(garbage_animations.values()))
+            column = random.randint(2, row_max-2)
+            # COROUTINES_TO_ADD.append(fly_garbage(canvas, column, garbage_frame))
+            LOOP.create_task(fly_garbage(canvas, column, garbage_frame, obstacle_id))
+            obstacle_id += 1
+            # await Sleep(garbage_intension)
+            await asyncio.sleep(garbage_intension)
+        else:
+            await asyncio.sleep(0.1)
+
 
 async def show_gameover(canvas):
+    """Show gameover"""
     rows_number, columns_number = canvas.getmaxyx()
     go_row, go_col = get_frame_size(GAMEOVER)
     while True:
         draw_frame(canvas, (rows_number - go_row) // 2, (columns_number - go_col) // 2, GAMEOVER)
         canvas.refresh()
         await asyncio.sleep(0.1)
+
+async def count_years(text_canvas):
+    """Count years"""
+    global YEAR
+    while True:
+        text_canvas.addstr(1, 1, str(YEAR))
+        if YEAR in PHRASES:
+            text_canvas.addstr(1, 6, PHRASES[YEAR])
+        text_canvas.refresh()
+        await asyncio.sleep(1.5)
+        YEAR += 1
 
 # def draw(canvas):
 #     """Draw all elements
@@ -221,21 +246,24 @@ def draw_2(canvas):
     canvas.nodelay(True)
     curses.curs_set(False)
     canvas.refresh()
-    coroutines = {}
-    y_max, x_max = canvas.getmaxyx()
-    test = canvas.derwin(3, x_max//3, 0, x_max//3 * 2)
-    test.border()
-    test.addstr(1, 1, 'TOST')
+    # coroutines = {}
+    canvas_y, cancas_x = canvas.getmaxyx()
+    text_canvas = canvas.derwin(3, cancas_x//3, 0, cancas_x//3 * 2)
+    text_canvas.border()
+    canvas_game = canvas.derwin(canvas_y - 3, cancas_x, 3, 0)
+    canvas_game.border()
+    y_max, x_max = canvas_game.getmaxyx()
     garbage = get_garbage_animation()
     for _ in range(100):
-        x_cord = random.randint(1,x_max -1)
-        y_cord = random.randint(1,y_max -1)
+        x_cord = random.randint(1, x_max -1)
+        y_cord = random.randint(1, y_max -1)
         symbol = random.choice(('+', '*', '.', ':'))
-        LOOP.create_task(blink(canvas, y_cord, x_cord, symbol))
-    LOOP.create_task(fill_orbit_with_garbage(canvas, garbage, 5, x_max))
+        LOOP.create_task(blink(canvas_game, y_cord, x_cord, symbol))
+    LOOP.create_task(fill_orbit_with_garbage(canvas_game, garbage, x_max))
     LOOP.create_task(animate_spaceship2())
-    LOOP.create_task(run_spaceship(canvas))
+    LOOP.create_task(run_spaceship(canvas_game))
     LOOP.create_task(handle_buttons(canvas))
+    LOOP.create_task(count_years(text_canvas))
     LOOP.run_forever()
 
 def main():
