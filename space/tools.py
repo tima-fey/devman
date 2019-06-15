@@ -5,8 +5,6 @@ LEFT_KEY_CODE = 260
 RIGHT_KEY_CODE = 261
 UP_KEY_CODE = 259
 DOWN_KEY_CODE = 258
-# ROW_SPEED = 0
-# COLUMN_SPEED = 0
 
 FILES_WITH_GARBAGE = {
     'duck': 'animations/duck.txt',
@@ -18,7 +16,6 @@ FILES_WITH_GARBAGE = {
 }
 def read_controls(canvas):
     """Read keys pressed and returns tuple witl controls state."""
-    # global ROW_SPEED, COLUMN_SPEED
     row_speed = 0
     column_speed = 0
     rows_direction = columns_direction = 0
@@ -27,8 +24,6 @@ def read_controls(canvas):
     pressed_key_code = canvas.getch()
 
     if pressed_key_code == -1:
-        # https://docs.python.org/3/library/curses.html#curses.window.getch
-        # break
         return rows_direction, columns_direction, space_pressed
 
     if pressed_key_code == UP_KEY_CODE:
@@ -95,14 +90,6 @@ def convert_seconds_to_iterations(seconds, timer):
     """
     return seconds * timer
 
-
-def get_file(file_name):
-    """Return content of the file
-    """
-    with open(file_name) as _file:
-        content = _file.read()
-    return content
-
 def change_position(row, col, frame_row, frame_col, delta_row, delta_column, row_max, col_max):
     """Count new position acording to the button pushed by user
 
@@ -113,8 +100,6 @@ def change_position(row, col, frame_row, frame_col, delta_row, delta_column, row
     frame_col - column size of the frame
     return (row, column) - new position
     """
-    # delta_row, delta_column, _ = read_controls(canvas)
-    # row_max, col_max = canvas.getmaxyx()
     new_position_row = row + delta_row
     new_position_col = col + delta_column
     if new_position_row + frame_row // 2 >= row_max - 6:
@@ -134,12 +119,6 @@ def get_garbage_animation():
         with open(garbage_file) as _file:
             garbage_animation[garbage_type] = _file.read()
     return garbage_animation
-
-def get_gameover():
-    """Get game over logo"""
-    with open('animations/gameover.txt') as _file:
-        answer = _file.read()
-    return answer
 
 
 PHRASES = {
