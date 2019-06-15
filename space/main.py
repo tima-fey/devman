@@ -61,7 +61,7 @@ async def fire(canvas, start_row, start_column, rows_speed=-0.3, columns_speed=0
 
     while 0 < row < max_row and 0 < column < max_column:
         for key in list(active_obstacles.keys()):
-#cant remove list(), or I get RuntimeError: dictionary changed size during iteration
+#can't remove list(), or I get RuntimeError: dictionary changed size during iteration
             if active_obstacles[key].has_collision(round(row), round(column)):
                 canvas.addstr(round(row), round(column), ' ')
                 active_obstacles.pop(key)
@@ -229,5 +229,4 @@ def main():
         sys.exit(0)
 
 if __name__ == '__main__':
-    # asyncio.run(main(),debug=True)
     main()
