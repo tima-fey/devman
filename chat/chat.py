@@ -7,7 +7,6 @@ import json
 
 from aiofile import AIOFile
 
-
 async def connector(host, port, async_function, args):
     timer = 0
     try:
@@ -17,14 +16,21 @@ async def connector(host, port, async_function, args):
         await asyncio.sleep(2 ** timer)
         reader, writer = await asyncio.open_connection(host=host, port=port)
         timer += 1
-    while True:
+    except asyncio.CancelledError:
+        writer.close()
+        raise
+    answer = True
+    while answer:
         try:
-            await async_function(reader, writer, args)
+            answer = await async_function(reader, writer, args)
         except (ConnectionRefusedError, ConnectionResetError):
             logging.warning('sleep %s seconds', 2 ** timer)
             await asyncio.sleep(2 ** timer)
             reader, writer = await asyncio.open_connection(host=host, port=port)
             timer += 1
+        except asyncio.CancelledError:
+            writer.close()
+            raise
 
 async def read_from_socket(reader, *_):
     text = await reader.readline()
@@ -32,6 +38,7 @@ async def read_from_socket(reader, *_):
     async with AIOFile("text.txt", 'a') as _file:
         await _file.write('[{}] {}'.format(time_now, text.decode("utf-8")))
     print(text.decode("utf-8"))
+    return True
 
 
 async def register(reader, writer, args):
@@ -73,7 +80,7 @@ async def submit_message(reader, writer, args):
     else:
         await authorise(reader, writer, args, token)
     writer.write('{}\n\n'.format(args.text.replace('\n', ' ')).encode())
-    raise StopIteration
+    return False
 
 async def main():
     # logging.basicConfig(level=logging.DEBUG)
