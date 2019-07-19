@@ -24,6 +24,7 @@ by default server connect to 5000 and 5050 port
 python3 chat.py --help
 usage: chat.py [-h] [--host HOST] [--rport RPORT] [--sport SPORT]
                [--user USER] [--token_file TOKEN_FILE] [--text TEXT]
+               [--send_only]
 
 connect to secret chat
 
@@ -32,10 +33,11 @@ optional arguments:
   --host HOST           Host to connect
   --rport RPORT         Specify port to receive msg
   --sport SPORT         Specify port to send msg
-  --user USER           set a username, it is oblicated for first run
+  --user USER           set a username
   --token_file TOKEN_FILE
                         set a file with token
   --text TEXT           set a text to send
+  --send_only           set a send only mode
 ```
 
 # Project goals

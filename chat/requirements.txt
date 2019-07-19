@@ -1,1 +1,1 @@
-aiofile
+aiofile=1.5.2
