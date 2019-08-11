@@ -18,6 +18,7 @@ is_connection_successful = False
 class InvalidToken(Exception):
     pass
 
+
 async def register(reader, writer, args):
     if not args.user:
         logging.error("It's obligated to specidy login if you do not have the correct token file")
@@ -47,7 +48,6 @@ async def authorise(reader, writer, token):
     answer_dict = json.loads(decoded_answer)
     return answer_dict['nickname']
 
-
 async def connect_to_receiver(host, port, args, status_updates_queue):
     while True:
         try:
@@ -72,8 +72,7 @@ async def connect_to_receiver(host, port, args, status_updates_queue):
             logging.error('invalid token')
             messagebox.showinfo("Invalid token", "Please, check your token, or remove it, to get another one")
             raise
-        except (ConnectionRefusedError, ConnectionResetError):
-            pass
+
 
 async def send_msgs(host, port, args, send_queue, store_queue, status_updates_queue, watchdog_queue):
     writer = await connect_to_receiver(host, port, args, status_updates_queue)
@@ -86,16 +85,10 @@ async def send_msgs(host, port, args, send_queue, store_queue, status_updates_qu
                 continue
             time_now = datetime.datetime.now().strftime("%y.%m.%d %H.%M")
             msg = '[{}] {}'.format(time_now, msg)
-            store_queue.put_nowait(msg)
+            store_queue.put_nowait('{}\n'.format(msg))
             watchdog_queue.put_nowait('send msg to server')
             writer.write('{}\n'.format(msg).encode())
             logging.info('text has been successfully sent')
-        except (ConnectionRefusedError, ConnectionResetError):
-            status_updates_queue.put_nowait(gui.SendingConnectionStateChanged.CLOSED)
-            logging.warning('sleep %s seconds', 2 ** timer)
-            await asyncio.sleep(2 ** timer)
-            writer = await connect_to_receiver(host, port, args, status_updates_queue)
-            timer += 1
         except asyncio.CancelledError:
             writer.close()
             raise
@@ -112,12 +105,6 @@ async def read_from_socket(host, port, messages_queue, status_updates_queue, wat
             time_now = datetime.datetime.now().strftime("%y.%m.%d %H.%M")
             messages_queue.put_nowait('[{}] {}'.format(time_now, text.decode("utf-8")))
             watchdog_queue.put_nowait('get msg from socket')
-        except (ConnectionRefusedError, ConnectionResetError):
-            status_updates_queue.put_nowait(gui.ReadConnectionStateChanged.CLOSED)
-            logging.warning('sleep %s seconds', 2 ** timer)
-            await asyncio.sleep(2 ** timer)
-            reader, writer = None, None
-            timer += 1
         except asyncio.CancelledError:
             writer.close()
             raise
@@ -127,23 +114,21 @@ async def save_messages(messages_to_file, messages_to_gui, file_name):
         while True:
             msg = await messages_to_file.get()
             messages_to_gui.put_nowait(msg)
-            time_now = datetime.datetime.now().strftime("%y.%m.%d %H.%M")
-            await _file.write('[{}] {}'.format(time_now, msg))
+            # time_now = datetime.datetime.now().strftime("%y.%m.%d %H.%M")
+            await _file.write(msg)
 
 
 async def watchdog(watchdog_queue, logger, time_out):
     global is_connection_successful
     while True:
         try:
-            async with async_timeout.timeout(time_out) as timeout_cm:
+            async with async_timeout.timeout(time_out):
                 msg = await watchdog_queue.get()
                 is_connection_successful = True
-                logger.info('%s %s', str(datetime.datetime.now()), msg)
+                # logger.info('%s %s', str(datetime.datetime.now()), msg)
         except asyncio.TimeoutError:
             logger.error('timeout expired')
             raise
-        # if timeout_cm.expired:
-        #     logger.info('timeout expired')
 
 async def handle_connection(args, messages_to_file, status_updates_queue, watchdog_queue, sending_queue, logger, time_out):
     global is_connection_successful
@@ -169,11 +154,10 @@ async def ping(time_out, sending_queue):
     while True:
         sending_queue.put_nowait('')
         await asyncio.sleep(time_out / 2)
-        
-    
+
 async def main():
     time_out = 4
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.WARNING)
     logger = logging.getLogger('watchdog_logger')
 
     parser = argparse.ArgumentParser(description='connect to secret chat')
@@ -193,28 +177,28 @@ async def main():
 
     status_updates_queue.put_nowait(gui.ReadConnectionStateChanged.INITIATED)
 
-    with open(args.log_file, 'r') as _file:
-        for line in _file.readlines():
-            messages_to_gui.put_nowait(line)
+    try:
+        with open(args.log_file, 'r') as _file:
+            for line in _file.readlines():
+                messages_to_gui.put_nowait(line)
+    except FileNotFoundError:
+        pass
 
-    await asyncio.gather(
-        gui.draw(messages_to_gui, sending_queue, status_updates_queue),
-        handle_connection(args, messages_to_file, status_updates_queue, watchdog_queue, sending_queue, logger, time_out),
-        save_messages(messages_to_file, messages_to_gui, args.log_file),
-        ping(time_out, sending_queue)
-    )
-    # async with aionursery.Nursery() as nursery:
-    #     nursery.start_soon(asyncio.shield(gui.draw(messages_to_gui, sending_queue, status_updates_queue)))
-    #     nursery.start_soon(asyncio.shield(handle_connection(args, messages_to_file, status_updates_queue, watchdog_queue, sending_queue, logger, time_out)))
-    #     nursery.start_soon(asyncio.shield(save_messages(messages_to_file, messages_to_gui, args.log_file)))
-    #     nursery.start_soon(asyncio.shield(ping(time_out, sending_queue)))
-   
-    
+    async with aionursery.Nursery() as nursery:
+        nursery.start_soon(gui.draw(messages_to_gui, sending_queue, status_updates_queue))
+        nursery.start_soon(handle_connection(args, messages_to_file, status_updates_queue, watchdog_queue, sending_queue, logger, time_out))
+        nursery.start_soon(save_messages(messages_to_file, messages_to_gui, args.log_file))
+        nursery.start_soon(ping(time_out, sending_queue))
+    # await asyncio.gather(
+    #     gui.draw(messages_to_gui, sending_queue, status_updates_queue),
+    #     handle_connection(args, messages_to_file, status_updates_queue, watchdog_queue, sending_queue, logger, time_out),
+    #     save_messages(messages_to_file, messages_to_gui, args.log_file),
+    #     ping(time_out, sending_queue)
+    # )
+
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, gui.TkAppClosed, InvalidToken):
-        pass
-    except Exception:
-        pass
+        sys.exit()
