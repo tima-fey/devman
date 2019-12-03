@@ -185,8 +185,6 @@ async def main():
     status_updates_queue = asyncio.Queue()
     watchdog_queue = asyncio.Queue()
 
-    status_updates_queue.put_nowait(gui.ReadConnectionStateChanged.INITIATED)
-
     try:
         with open(args.log_file, 'r') as _file:
             for line in _file.readlines():
