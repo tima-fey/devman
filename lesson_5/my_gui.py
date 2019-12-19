@@ -4,6 +4,7 @@ import logging
 import datetime
 import argparse
 import json
+from socket import gaierror
 from tkinter import messagebox
 
 from aiofile import AIOFile
@@ -102,12 +103,10 @@ async def save_messages(messages_to_file, messages_to_gui, file_name):
             await _file.write(msg)
 
 
-async def watchdog(watchdog_queue, time_out, status_updates_queue):
+async def watchdog(watchdog_queue, time_out):
     while True:
         async with async_timeout.timeout(time_out):
             _ = await watchdog_queue.get()
-        status_updates_queue.put_nowait(gui.ReadConnectionStateChanged.ESTABLISHED)
-        status_updates_queue.put_nowait(gui.SendingConnectionStateChanged.ESTABLISHED)
 
 async def handle_connection(messages_to_file, status_updates_queue, watchdog_queue, sending_queue, time_out, user, host, rport, sport, token_file, token):
     logger = logging.getLogger('watchdog_logger')
@@ -116,12 +115,16 @@ async def handle_connection(messages_to_file, status_updates_queue, watchdog_que
             async with aionursery.Nursery() as nursery:
                 nursery.start_soon(read_from_socket(host, rport, messages_to_file, status_updates_queue, watchdog_queue))
                 nursery.start_soon(send_msgs(host, sport, sending_queue, messages_to_file, status_updates_queue, watchdog_queue, user, token_file, token))
-                nursery.start_soon(watchdog(watchdog_queue, time_out, status_updates_queue))
-        except aionursery.MultiError:
-            logger.error('timeout error')
+                nursery.start_soon(watchdog(watchdog_queue, time_out))
+                nursery.start_soon(ping(time_out, sending_queue))
+        except aionursery.MultiError as err:
             status_updates_queue.put_nowait(gui.SendingConnectionStateChanged.CLOSED)
             status_updates_queue.put_nowait(gui.ReadConnectionStateChanged.CLOSED)
-            await asyncio.sleep(5)
+            if isinstance(err.exceptions[0], (asyncio.TimeoutError, gaierror)):
+                logger.error('timeout error')
+                await asyncio.sleep(5)
+            else:
+                raise
 
 
 async def ping(time_out, sending_queue):
@@ -172,7 +175,6 @@ async def main():
     async with aionursery.Nursery() as nursery:
         nursery.start_soon(gui.draw(messages_to_gui, sending_queue, status_updates_queue))
         nursery.start_soon(save_messages(messages_to_file, messages_to_gui, args.log_file))
-        nursery.start_soon(ping(time_out, sending_queue))
         nursery.start_soon(handle_connection(
             messages_to_file,
             status_updates_queue,
