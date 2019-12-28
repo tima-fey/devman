@@ -67,12 +67,15 @@ async def connect_to_receiver(host, port, status_updates_queue, user, token_file
             raise
 
 
-async def send_msgs(host, port, send_queue, store_queue, status_updates_queue, watchdog_queue, user, token_file, token):
+async def send_msgs(host, port, send_queue, store_queue, status_updates_queue, watchdog_queue, user, token_file, token, timeout):
     logger = logging.getLogger('send_msgs_logger')
     writer = await connect_to_receiver(host, port, status_updates_queue, user, token_file, token)
     await writer.drain()
     while True:
-        msg = await send_queue.get()
+        try:
+            msg = await asyncio.wait_for(send_queue.get(), timeout=timeout/2)
+        except asyncio.TimeoutError:
+            msg = None
         if not msg:
             writer.write(''.encode())                                         # send ping
             continue
@@ -114,23 +117,16 @@ async def handle_connection(messages_to_file, status_updates_queue, watchdog_que
         try:
             async with aionursery.Nursery() as nursery:
                 nursery.start_soon(read_from_socket(host, rport, messages_to_file, status_updates_queue, watchdog_queue))
-                nursery.start_soon(send_msgs(host, sport, sending_queue, messages_to_file, status_updates_queue, watchdog_queue, user, token_file, token))
+                nursery.start_soon(send_msgs(host, sport, sending_queue, messages_to_file, status_updates_queue, watchdog_queue, user, token_file, token, time_out))
                 nursery.start_soon(watchdog(watchdog_queue, time_out))
-                nursery.start_soon(ping(time_out, sending_queue))
         except aionursery.MultiError as err:
             status_updates_queue.put_nowait(gui.SendingConnectionStateChanged.CLOSED)
             status_updates_queue.put_nowait(gui.ReadConnectionStateChanged.CLOSED)
-            if isinstance(err.exceptions[0], (asyncio.TimeoutError, gaierror)):
+            if isinstance(err.exceptions[0], (asyncio.TimeoutError, gaierror, ConnectionError)):
                 logger.error('timeout error')
                 await asyncio.sleep(5)
             else:
                 raise
-
-
-async def ping(time_out, sending_queue):
-    while True:
-        sending_queue.put_nowait('')
-        await asyncio.sleep(time_out / 2)
 
 async def main():
     time_out = 4
